@@ -66,7 +66,7 @@ Kinds: `product`, `technical`, `ui`, `development`, `testing`, `release`. Regist
 
 Use [html-deliverables.md](html-deliverables.md) for the shared HTML structure and portable technical/release field mapping. `workspace document <task-dir> --kind technical --phase P1 --version v0.1` exports and registers a self-contained version snapshot without overwriting prior versions.
 
-Each Phase may have `releaseChecklist` entries with `id/title/checked`. The independent release page saves manual checks and records who checked and when. A checkbox is a user attestation, not an application deployment or gate approval. It does not change `DONE`, test evidence or candidate SHAs.
+The release page shows only applicable deployment resources (PRs, configuration key/value/description, SQL and other required resources) and rollout order. Existing `releaseChecklist`, deployment, test and approval records remain in SQLite; the compact page does not repeat or change them. Resource links in sandboxed HTML may navigate the top-level page only after user activation; same-origin access remains disabled.
 
 The native link format `codex://threads/<threadId>` was verified in the installed desktop app on 2026-09-10. Binding with `workspace bind --thread-id` verifies that Codex can read that exact ID. Do not invent IDs or bind by matching a title. When `init` receives the current `CODEX_THREAD_ID`, it records that explicit identity; no other conversations are searched or created.
 

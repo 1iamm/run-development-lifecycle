@@ -336,6 +336,19 @@ class WorkspaceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Reconcile'):
             export_document(self.store,self.key,'P1','product','v2')
 
+    def test_resource_urls_are_clickable_but_unsafe_content_remains_text(self):
+        from workspace_documents import render_value
+        source='https://example.com/pull/42?a=1&b=2'
+        rendered=render_value(source)
+        self.assertIn('href="https://example.com/pull/42?a=1&amp;b=2"',rendered)
+        self.assertIn('target="_top"',rendered)
+        for value in ('javascript:alert(1)','data:text/html,<script>alert(1)</script>',
+                      '//example.com','https://[invalid','https://example.com/\npath',
+                      'https://example.com/" onclick="alert(1)'):
+            with self.subTest(value=value):
+                self.assertNotIn('<a ',render_value(value))
+                self.assertNotIn('<script>',render_value(value))
+
 
 class WorkspaceHTTPTests(unittest.TestCase):
     complete=WorkspaceTests.complete
@@ -367,6 +380,35 @@ class WorkspaceHTTPTests(unittest.TestCase):
             content=self.get('/tasks/'+self.key+'/documents/'+kind)
             self.assertIn(b'<!doctype html>',content)
         with self.assertRaises(HTTPError): self.get('/tasks/'+self.key+'/documents/unknown')
+
+    def test_release_resources_and_order_match_export_without_mutating_ledger(self):
+        from workspace_documents import export_document
+        phase,revision=self.store.get_document(self.key,'phases/P1.json')
+        phase['documents']={'release':{
+            'code':[{'repository':'example-service','prUrl':'https://example.com/pull/42','prStatus':'待合并'}],
+            'lion':[{'key':'example.enabled','value':'false','description':'首次发布保持关闭'},
+                    {'key':'old.setting','status':'unchanged'}],
+            'sql':{'status':'not-applicable','reason':'No schema changes'},
+            'rollout':['先配置 example.enabled','再发布 example-service'],
+        }}
+        phase['branch']['name']='branch-history-marker'
+        self.store.put_document(self.key,'phases/P1.json',phase,revision)
+        before=self.store.get_document(self.key,'phases/P1.json')
+        result=export_document(self.store,self.key,'P1','release','v1')
+        for content in (self.get('/tasks/'+self.key+'/documents/release').decode(),Path(result['path']).read_text()):
+            self.assertIn('href="https://example.com/pull/42"',content)
+            self.assertIn('首次发布保持关闭',content)
+            self.assertIn('先配置 example.enabled',content)
+            self.assertLess(content.index('先配置 example.enabled'),content.index('再发布 example-service'))
+            for hidden in ('old.setting','No schema changes','branch-history-marker','最近变更记录','版本文档与附件','当前阶段状态：','上线检查表','实际发布与验证记录','class="doc-meta"','type="checkbox"'):
+                self.assertNotIn(hidden,content)
+        self.assertEqual(self.store.get_document(self.key,'phases/P1.json'),before)
+
+    def test_unprepared_release_resources_are_not_reported_as_no_changes(self):
+        content=self.get('/tasks/'+self.key+'/documents/release').decode()
+        self.assertIn('尚未整理上线资源',content)
+        self.assertIn('上线顺序',content)
+        self.assertNotIn('当前阶段状态：',content)
 
     def test_web_manual_archive_works_before_done_and_requires_origin_token(self):
         with self.assertRaises(HTTPError) as context:
@@ -401,7 +443,9 @@ class WorkspaceHTTPTests(unittest.TestCase):
         identifier=self.store.add_deliverable(self.key,'P1','ui','UI',path,'v1')
         with urlopen(self.base+'/raw/'+identifier) as response:
             self.assertIn('sandbox allow-scripts',response.headers['Content-Security-Policy'])
-        self.assertIn(b'sandbox="allow-scripts"',self.get('/deliverables/'+identifier))
+            self.assertIn('allow-top-navigation-by-user-activation',response.headers['Content-Security-Policy'])
+            self.assertNotIn('allow-same-origin',response.headers['Content-Security-Policy'])
+        self.assertIn(b'sandbox="allow-scripts allow-top-navigation-by-user-activation"',self.get('/deliverables/'+identifier))
         record=self.archive()
         self.store.cleanup(dt.datetime.fromisoformat(record['expires_at']))
         with self.assertRaises(HTTPError): self.get('/deliverables/'+identifier)

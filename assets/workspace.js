@@ -2,7 +2,7 @@
   'use strict';
   const kinds=['product','technical','ui','development','testing','release'];
   const labels=['产品','技术','UI','开发','测试','上线'];
-  const artifactLabels=['产品 PRD','技术设计','UI 与交互稿','开发记录','测试用例与结果','上线资源与检查表'];
+  const artifactLabels=['产品 PRD','技术设计','UI 与交互稿','开发记录','测试用例与结果','上线资源'];
   const states={active:'进行中',blocked:'已阻塞',done:'已完成'};
   const query=new URLSearchParams(location.search);
   let tasks=[],selected=query.get('task'),view='board',token='',busy=false,detailSequence=0,signature='';

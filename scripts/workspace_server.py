@@ -93,7 +93,7 @@ def html_deliverable_page(record):
 <title>{title}</title><link rel="stylesheet" href="/workspace.css"></head>
 <body class="deliverable-viewer">
 <header class="deliverable-toolbar"><a href="{back}">← 返回任务</a><h1 title="{title}">{title}</h1></header>
-<main class="deliverable-content"><iframe class="deliverable-frame" sandbox="allow-scripts" src="{source}" title="{title}"></iframe></main>
+<main class="deliverable-content"><iframe class="deliverable-frame" sandbox="allow-scripts allow-top-navigation-by-user-activation" src="{source}" title="{title}"></iframe></main>
 </body></html>'''
 
 
@@ -157,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control','no-store')
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Referrer-Policy','no-referrer')
-        self.send_header('Content-Security-Policy',"sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'" if sandbox else "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
+        self.send_header('Content-Security-Policy',"sandbox allow-scripts allow-top-navigation-by-user-activation; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'" if sandbox else "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
         self.end_headers()
         self.wfile.write(data)
 
@@ -194,16 +194,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Local archive copy expired; the Codex conversation is retained')
             registered = [d for d in detail['deliverables'] if d['kind']==kind]
             links = ''.join(f'<p><a href="/deliverables/{d["id"]}">{html.escape(d["title"])} · {html.escape(d["version"])}</a></p>' for d in registered)
-            phases = []
-            for phase in detail['phases'].values():
-                checklist = None
-                if kind=='release':
-                    revision = detail['revisions']['phases/'+phase['id']+'.json']
-                    checklist = '<p class="muted small">勾选记录你的确认，不触发部署，也不自动通过完成门禁。</p>'+''.join(
-                        f'<label class="release-check"><input type="checkbox" data-task="{key}" data-phase="{html.escape(phase["id"],quote=True)}" data-item="{html.escape(item["id"],quote=True)}" data-revision="{revision}" {"checked" if item.get("checked") else ""} {"disabled" if detail["archive_state"] not in ("active","failed") else ""}><span>{html.escape(item["title"])}<small>{html.escape(item.get("checkedAt","待确认"))}</small></span></label>' for item in phase.get('releaseChecklist',[]))
-                phases.append(render_phase(phase,kind,checklist))
+            phases = [render_phase(phase,kind) for phase in detail['phases'].values()]
             contents = document_contents(detail,kind,phase_html=''.join(phases))
-            files = '<section><h2>版本文档与附件</h2>'+links+'</section>' if links else ''
+            files = '<section><h2>版本文档与附件</h2>'+links+'</section>' if links and kind!='release' else ''
             self.respond(document_page(detail['task']['title']+' · '+TITLES[kind],files+contents,'/?task='+key),'text/html; charset=utf-8')
         elif len(parts)==2 and parts[0] in ('deliverables','raw'):
             with store.connect() as db:

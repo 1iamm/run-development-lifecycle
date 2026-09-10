@@ -83,6 +83,20 @@ def document_page(title, contents, back='/'):
     return f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/document.css"><script defer src="/checklist.js"></script><body><main class="document-page"><a href="{html.escape(back,quote=True)}">← 返回任务</a><h1>{html.escape(title)}</h1><p id="checklist-status" role="status"></p>{contents}</main></body></html>'''
 
 
+def html_deliverable_page(record):
+    """Give sandboxed HTML the viewport below a compact task navigation bar."""
+    title = html.escape(record['title'] + (' · ' + record['version'] if record['version'] else ''))
+    back = html.escape('/?task=' + record['task_key'], quote=True)
+    source = html.escape('/raw/' + record['id'], quote=True)
+    return f'''<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title><link rel="stylesheet" href="/workspace.css"></head>
+<body class="deliverable-viewer">
+<header class="deliverable-toolbar"><a href="{back}">← 返回任务</a><h1 title="{title}">{title}</h1></header>
+<main class="deliverable-content"><iframe class="deliverable-frame" sandbox="allow-scripts" src="{source}" title="{title}"></iframe></main>
+</body></html>'''
+
+
 def structured_html(value):
     if isinstance(value,dict):
         return '<dl>'+''.join('<dt>'+html.escape(KEY_LABELS.get(k,str(k)))+'</dt><dd>'+structured_html(v)+'</dd>' for k,v in value.items())+'</dl>'
@@ -208,7 +222,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(path.read_bytes(),mime,sandbox=True)
             else:
                 if path.suffix.lower() in ('.html','.htm'):
-                    content = f'<iframe class="prototype" sandbox="allow-scripts" src="/raw/{record["id"]}" title="{html.escape(record["title"],quote=True)}"></iframe>'
+                    self.respond(html_deliverable_page(record),'text/html; charset=utf-8')
+                    return
                 elif path.suffix.lower() in ('.png','.jpg','.jpeg','.webp','.gif'):
                     content = f'<img class="design-image" src="/raw/{record["id"]}" alt="{html.escape(record["title"],quote=True)}">'
                 elif path.suffix.lower() in ('.md','.txt','.json','.csv'):

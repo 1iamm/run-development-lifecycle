@@ -6,6 +6,7 @@ PRD 与技术方案必须遵循 [visual-narrative.md](visual-narrative.md) 的�
 
 ## 阅读与版本
 
+- 版本 HTML 与交互原型打开后占满浏览器可用区域，顶部仅保留紧凑的返回任务栏和文档版本；正文使用剩余全部宽高，不套固定高度或限宽的预览卡片。保留沙箱隔离，历史文件本身不因查看器布局调整而重写。
 - 当前页：`/tasks/<taskKey>/documents/<kind>`，由 SQLite 生成，展示项目、任务编号、负责人、生命周期状态、数据修订号、更新时间及最近变更。
 - 评审交付：在相关结构化数据补齐后，用 `workspace document <task-dir> --phase P1 --kind technical --version v0.1` 生成并登记独立 HTML。其他 kind 同理。文件位于 `deliverables/P1/technical/v0.1.html`，CSS 内嵌，可离线阅读；同一版本拒绝覆盖，修订使用新版本号。
 - 同一套渲染器服务当前页和版本快照，快照明确注明时点，不能把历史快照当作当前状态。导出不会确认方案、推进阶段或把测试改为通过。

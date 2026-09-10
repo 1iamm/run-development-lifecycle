@@ -123,7 +123,7 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.store.row(self.key)['archive_state'],'active')
         self.assertEqual(summary(self.store.detail(self.key))['stage'],'release')
 
-    def test_resolved_historical_issues_do_not_make_board_blocked(self):
+    def test_issues_do_not_mean_waiting_for_user(self):
         phase,revision=self.store.get_document(self.key,'phases/P1.json')
         phase['issues']=[{'id':'old','severity':'blocker','status':'resolved-by-user-acceptance'},{'id':'baseline','status':'baseline-confirmed'}]
         self.store.put_document(self.key,'phases/P1.json',phase,revision)
@@ -131,7 +131,72 @@ class WorkspaceTests(unittest.TestCase):
         phase,revision=self.store.get_document(self.key,'phases/P1.json')
         phase['issues'].append({'id':'new','severity':'blocker','status':'open'})
         self.store.put_document(self.key,'phases/P1.json',phase,revision)
-        self.assertEqual(summary(self.store.detail(self.key))['status'],'blocked')
+        view=summary(self.store.detail(self.key))
+        self.assertEqual(view['status'],'active')
+        self.assertEqual([c['id'] for c in view['concerns']],['new'])
+        self.assertEqual(view['blockers'],[])
+
+    def test_only_explicit_user_wait_blocks_and_resume_clears_action(self):
+        phase,revision=self.store.get_document(self.key,'phases/P1.json')
+        phase['execution']={'status':'blocked','summary':'方案已准备完成','requiredAction':'确认是否采用方案 A'}
+        self.store.put_document(self.key,'phases/P1.json',phase,revision)
+        view=summary(self.store.detail(self.key))
+        self.assertEqual(view['status'],'blocked')
+        self.assertEqual(view['statusReason'],'方案已准备完成')
+        self.assertEqual(view['requiredAction'],'确认是否采用方案 A')
+        phase,revision=self.store.get_document(self.key,'phases/P1.json')
+        phase['execution']={'status':'active','summary':'按已确认方案实施','requiredAction':''}
+        self.store.put_document(self.key,'phases/P1.json',phase,revision)
+        view=summary(self.store.detail(self.key))
+        self.assertEqual(view['status'],'active')
+        self.assertEqual(view['requiredAction'],'')
+        self.assertEqual(view['blockers'],[])
+
+    def test_agent_owned_failures_decisions_and_dirty_exports_stay_visible(self):
+        detail=self.store.detail(self.key)
+        phase=detail['phases']['P1']
+        phase['state']='REQUIREMENTS_REVIEW'
+        phase['scope']['blockingDecisions']=[{'id':'D1','question':'调查接口是否支持','status':'open'}]
+        phase['tests']=[{'id':'T1','status':'FAIL','actual':'需要修复'}]
+        phase['branch']['syncStatus']='STALE_PARENT'
+        detail['dirtyExports']=['phases/P1.json']
+        view=summary(detail)
+        self.assertEqual(view['status'],'active')
+        self.assertEqual(len(view['concerns']),4)
+        self.assertEqual(view['statusSource'],'unrecorded')
+        # Board presentation must not relax the existing requirements gate.
+        self.assertIn('调查接口是否支持',lifecycle.unresolved_blockers(detail['task'],phase,{}))
+
+    def test_execution_validation_requires_reason_and_action_without_mutation(self):
+        phase,revision=self.store.get_document(self.key,'phases/P1.json')
+        for invalid in ({'status':'blocked','summary':'waiting'}, {'status':'blocked','summary':'','requiredAction':'confirm'},
+                        {'status':'active','summary':'working','requiredAction':'stale action'}, {'status':'unknown','summary':'x'}):
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError):
+                self.store.put_document(self.key,'phases/P1.json',{**phase,'execution':invalid},revision)
+            self.assertEqual(self.store.get_document(self.key,'phases/P1.json'),(phase,revision))
+
+    def test_previous_phase_wait_does_not_block_current_phase_or_done_task(self):
+        detail=self.store.detail(self.key)
+        detail['phases']['P0']={'execution':{'status':'blocked','summary':'旧评审','requiredAction':'确认旧方案'}}
+        self.assertEqual(summary(detail)['status'],'active')
+        detail['phases']['P1']['execution']={'status':'blocked','summary':'待确认','requiredAction':'确认'}
+        detail['task']['state']='DONE'
+        self.assertEqual(summary(detail)['status'],'done')
+        self.assertEqual(summary(detail)['blockers'],[])
+
+    def test_activity_command_preserves_phase_and_rejects_stale_revision(self):
+        import workspace_cli
+        phase,revision=self.store.get_document(self.key,'phases/P1.json')
+        args=argparse.Namespace(workspace_action='activity',task_dir=str(self.task_dir),phase='P1',status='blocked',
+                                summary='已完成评审稿',required_action='确认评审稿',expected_revision=revision)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(workspace_cli.command(args),0)
+        updated,new_revision=self.store.get_document(self.key,'phases/P1.json')
+        self.assertEqual({k:v for k,v in updated.items() if k!='execution'},phase)
+        self.assertEqual(new_revision,revision+1)
+        self.assertTrue(any(e['type']=='execution-update' for e in self.store.events(self.key)))
+        with self.assertRaisesRegex(ValueError,'Concurrent'):
+            workspace_cli.command(args)
 
     def test_unfinished_task_archives_without_changing_phase_progress_or_failures(self):
         phase,revision=self.store.get_document(self.key,'phases/P1.json')

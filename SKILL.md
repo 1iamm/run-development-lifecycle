@@ -15,6 +15,7 @@ Requires Python 3.10+ with SQLite. The core workspace and HTML export use only t
 
 - Open the shared board with `python3 <skill-dir>/scripts/lifecycle.py workspace serve`. It listens only on `127.0.0.1`; open the returned URL with the browser available in the current agent host. The default database is `~/.codex/lifecycle/workspace.sqlite3`, or `$LIFECYCLE_HOME/workspace.sqlite3` when configured.
 - The board has **产品 / 技术 / UI / 开发 / 测试 / 上线** columns and an all-task table. Cards show projects and current phases; task details expand in place. Deliverables open independent pages. Actual Codex conversations use the bound thread ID, never a title match.
+- Board **已阻塞** means the current next step requires the user to act or confirm. Agent research, implementation, debugging, test failures and pending technical decisions remain **进行中** while the agent can continue. Keep the active Phase `execution` record current when starting/resuming, handing work back, or receiving a user answer; use `workspace activity` as documented in [references/sqlite-workspace.md](references/sqlite-workspace.md). A blocked record must explain why and exactly what the user needs to do. Never infer user waiting from an issue severity or a review-stage name.
 - A board stage is a presentation of lifecycle state, not a replacement approval gate. Use `workspace bind --stage technical|ui` to distinguish those two design activities when needed; it does not approve design or advance implementation.
 - Read [references/sqlite-workspace.md](references/sqlite-workspace.md) for database updates, project/thread bindings, deliverables, imports, archive/retention, local service operation or troubleshooting.
 - Task completion does **not** archive the task or Codex conversation. Only the user's archive button or explicit archive request authorizes archive. Any lifecycle stage may be manually archived; archive does not imply completion and must preserve its current state, unfinished work and failed evidence.
@@ -100,6 +101,7 @@ Requires Python 3.10+ with SQLite. The core workspace and HTML export use only t
 | Validate/checkpoint/approve | `python3 <skill-dir>/scripts/lifecycle.py <validate|checkpoint|approve> ...` |
 | Append event/render/serve | `python3 <skill-dir>/scripts/lifecycle.py <event|render|serve> ...` |
 | Open the multi-project workspace | `python3 <skill-dir>/scripts/lifecycle.py workspace serve` |
+| Record current work or user wait | `python3 <skill-dir>/scripts/lifecycle.py workspace activity <task-dir> --phase <active-phase> --status <active-or-blocked> --summary "..." --expected-revision <revision> [--required-action "..."]` |
 | Read/update SQLite state | `python3 <skill-dir>/scripts/lifecycle.py workspace <read|update> <task-dir> ...` |
 | Bind project, conversation or design stage | `python3 <skill-dir>/scripts/lifecycle.py workspace bind <task-dir> ...` |
 | Export and register a versioned HTML document | `python3 <skill-dir>/scripts/lifecycle.py workspace document <task-dir> --kind technical --phase P1 --version v0.1` |

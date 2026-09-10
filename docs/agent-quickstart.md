@@ -83,6 +83,16 @@ Progress comes from `workItems`, for example:
 
 Use `DONE` only after the actual item is complete. Do not duplicate the same work at both task and Phase level. Missing work items produce an unknown progress indicator.
 
+Before starting/resuming work and whenever handing it back, record the active Phase's current execution ownership. A failed test or open issue does not mean the user must act:
+
+```bash
+python3 "$skill_dir/scripts/lifecycle.py" workspace activity /absolute/returned/taskDir \
+  --phase P1 --status active --summary "Implementing the approved API and running regression tests" \
+  --expected-revision 4
+```
+
+Use the latest revision, not the example `4`. When waiting for the user, use `--status blocked`, a reason in `--summary`, and a concrete `--required-action`. After the user replies, record `active` again, which clears the old required action. Only these explicit user waits show **已阻塞**. The board reads recorded state, not live process activity. See [execution status](../references/sqlite-workspace.md#execution-status-and-user-action) for the full contract.
+
 ## 6. Prepare, validate and approve
 
 Populate scope, requirements, applicable artifacts and planned tests. Follow the documented risk profile and the [visual narrative rules](../references/visual-narrative.md): PRD and technical documents use conclusion → diagram/table detail → decision/acceptance/risk, both overall and inside each module.

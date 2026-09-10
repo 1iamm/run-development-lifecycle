@@ -195,6 +195,9 @@ class Store:
             raise ValueError('Unsupported structured document')
         if not isinstance(value, dict):
             raise ValueError('Structured documents must be JSON objects')
+        if name.startswith('phases/') and 'execution' in value:
+            from workspace_status import validate_execution
+            validate_execution(value['execution'])
         if not allow_dirty_export:
             self.check_export(key,name)
         if expected is None:

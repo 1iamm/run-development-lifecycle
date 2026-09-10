@@ -26,6 +26,34 @@ Record `workItems` as `[{"id":"DEV-01","title":"...","status":"TODO"}]`, using `
 
 The board derives stages from lifecycle states. Product covers discovery/requirements review; technical/UI cover requirements-approved/design review; development covers approved design/implementation/fixes; testing covers local verification/E2E; release covers candidate/release/finalization/DONE. Use the separate design-stage hint for technical versus UI when actual work requires it. A hint never advances a gate or marks another stage complete.
 
+## Execution status and user action
+
+The board has three execution labels: **进行中**, **已阻塞**, **已完成**. Only an explicit current wait for the user is **已阻塞**. Research, implementation, debugging, unresolved technical questions, failed tests and parent synchronization remain **进行中** while the agent can continue. Review-stage names, issue severity, open issues and dirty exports do not establish user ownership. Those records stay visible under “问题与检查记录” and continue to affect the original lifecycle gates.
+
+The active Phase stores execution separately from its lifecycle `state`:
+
+```json
+{
+  "execution": {
+    "status": "blocked",
+    "summary": "方案已准备完成，等待范围确认后才能实施",
+    "requiredAction": "确认是否采用方案 A；评审稿在本任务的技术设计中",
+    "updatedAt": "2026-09-10T07:00:00+00:00"
+  }
+}
+```
+
+Use `active` with the current agent work in `summary` and an empty `requiredAction`. Use `blocked` only when the agent has reached a concrete user action or confirmation; both a reason and a specific action are required. Do not mark a future approval as a current wait while independent authorized work continues. `DONE` remains controlled by the existing lifecycle gate, never by this field.
+
+```bash
+python3 <skill-dir>/scripts/lifecycle.py workspace read <task-dir> --document phases/P1.json
+python3 <skill-dir>/scripts/lifecycle.py workspace activity <task-dir> --phase P1 --status blocked --summary "评审稿已完成，等待范围确认" --required-action "确认技术设计中的方案 A" --expected-revision <returned-revision>
+# After the user answers, read the new revision and resume:
+python3 <skill-dir>/scripts/lifecycle.py workspace activity <task-dir> --phase P1 --status active --summary "按已确认方案实现并回归" --expected-revision <new-revision>
+```
+
+This command changes execution metadata only, preserves approvals/tests/phase state and appends an audit event. It refuses stale revisions and externally edited exports. Keep the record current at turn start/resume, meaningful handoffs, and after a user reply. Do not leave a previous user wait active after work resumes. The board polls SQLite; it is not a live Codex-process monitor. Old tasks without this record show **进行中** with an explicit “尚未登记执行状态” note until their responsible agent reconciles the current work. Never parse arbitrary prose or historical issue lists to invent a user action.
+
 ## Project, conversation and deliverables
 
 ```bash

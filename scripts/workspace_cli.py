@@ -1,7 +1,7 @@
 """Workspace subcommands kept separate from the existing lifecycle validators."""
 import json
 from pathlib import Path
-from workspace_store import Store, binding, default_database, KINDS
+from workspace_store import Store, binding, default_database, KINDS, stamp
 
 
 def output(value):
@@ -31,6 +31,18 @@ def command(args):
     if action == 'read':
         data,revision = store.get_document(key,args.document)
         return output({'document':args.document,'revision':revision,'data':data})
+    if action == 'activity':
+        name = 'phases/'+args.phase+'.json'
+        phase,revision = store.get_document(key,name)
+        phase['execution'] = {
+            'status':args.status,'summary':args.summary,
+            'requiredAction':args.required_action or '', 'updatedAt':stamp(),
+        }
+        revision = store.put_document(key,name,phase,args.expected_revision)
+        store.audit(key,'execution-update',args.summary,phase=args.phase,execution=phase['execution'])
+        from lifecycle import render_task
+        render_task(Path(args.task_dir).resolve())
+        return output({'ok':True,'revision':revision,'execution':phase['execution']})
     if action == 'update':
         value = json.loads(Path(args.file).read_text(encoding='utf-8'))
         revision = store.put_document(key,args.document,value,args.expected_revision,allow_dirty_export=True)
@@ -94,13 +106,19 @@ def add_commands(commands):
     imp.add_argument('--project')
     imp.add_argument('--project-root',default='')
     imp.set_defaults(function=command)
-    for action in ('read','update','bind','deliverable','document','archive'):
+    for action in ('read','update','activity','bind','deliverable','document','archive'):
         parser = subs.add_parser(action)
         parser.add_argument('task_dir')
         if action in ('read','update'):
             parser.add_argument('--document',default='task.json')
         if action == 'update':
             parser.add_argument('--file',required=True,help='JSON input file outside the generated export paths')
+            parser.add_argument('--expected-revision',type=int,required=True)
+        if action == 'activity':
+            parser.add_argument('--phase',required=True)
+            parser.add_argument('--status',choices=('active','blocked'),required=True)
+            parser.add_argument('--summary',required=True,help='Current agent work or reason waiting for the user')
+            parser.add_argument('--required-action',help='Concrete user action; required only when blocked')
             parser.add_argument('--expected-revision',type=int,required=True)
         if action == 'bind':
             parser.add_argument('--project')

@@ -50,31 +50,19 @@ def summary(detail):
         checklist = [item for phase in phases for item in phase.get('workItems',[])]
     total = len(checklist)
     completed = sum(1 for item in checklist if isinstance(item,dict) and item.get('status') in ('DONE','done','PASS','complete'))
-    from lifecycle import unresolved_blockers
-    blocked = unresolved_blockers(task,active,detail.get('comments',{}))
-    for phase in phases:
-        for issue in phase.get('issues',[]):
-            if not isinstance(issue,dict):
-                continue
-            issue_state=str(issue.get('status','open')).lower()
-            if issue_state in ('closed','deferred','baseline-confirmed') or issue_state.startswith('resolved'):
-                continue
-            if issue.get('severity')=='blocker' or issue_state in ('open','blocked','unresolved','fixing','in_progress'):
-                blocked.append(issue)
-        if phase.get('branch',{}).get('syncStatus')=='STALE_PARENT':
-            blocked.append('STALE_PARENT: '+phase.get('id',''))
-        blocked.extend('测试失败: '+str(test.get('id','')) for test in phase.get('tests',[]) if isinstance(test,dict) and test.get('status') in ('FAIL','FAILED'))
+    from workspace_status import execution_status
+    execution = execution_status(detail)
     state = active.get('state',task.get('state'))
     dirty=detail.get('dirtyExports',[])
-    status = 'blocked' if dirty else 'done' if task.get('state')=='DONE' else 'blocked' if blocked else 'wait' if state in ('REQUIREMENTS_REVIEW','DESIGN_REVIEW','READY_DEPLOY') else 'active'
+    status = execution['status']
     return {k:detail[k] for k in ('key','project','thread_id','host_id','archive_state','stage')} | {
         'taskId':task['taskId'],'title':task['title'],'state':state,'stage':board_stage(detail),'status':status,
         'activePhase':task.get('activePhase'),'phaseCount':len(phases),'completed':completed,'total':total,
         'progress':round(completed*100/total) if total else (100 if status=='done' else None),
         'nextAction':('有外部文件改动待同步：'+', '.join(dirty)) if dirty else active.get('nextAction') or task.get('nextAction',''),
         'updatedAt':detail['updated_at'],'targetDate':task.get('targetDate',''),'archive':detail['archive'],
-        'artifactCount':len(detail['deliverables']), 'blockers':blocked,
-    }
+        'artifactCount':len(detail['deliverables']),
+    } | execution
 
 
 def safe_file(root, relative):

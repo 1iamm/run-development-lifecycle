@@ -1,0 +1,4 @@
+interface:
+  display_name: "开发迭代工作台"
+  short_description: "用本地 SQLite 管理多项目阶段看板、交付文档、Codex 任务与手动归档"
+  default_prompt: "使用 $run-development-lifecycle 在本地 SQLite 工作台中新建开发任务，关联当前项目与 Codex 任务，并按现有门禁推进和留痕。"

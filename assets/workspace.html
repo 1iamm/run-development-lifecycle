@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>迭代工作台</title>
+  <link rel="stylesheet" href="/workspace.css">
+  <script defer src="/workspace.js"></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">迭</span>迭代工作台 <span class="local-label">本地 · SQLite</span></div><nav aria-label="工作台导航"><button type="button" data-view="board" aria-current="page">看板与任务</button><button type="button" data-view="archive">归档 <span id="archive-count">0</span></button></nav></header>
+  <main class="workspace">
+    <div class="page-heading"><div><h1 id="page-title">迭代看板</h1><p id="summary" class="muted">正在读取本地任务…</p></div><div class="sync-state" id="sync-state">连接中</div></div>
+    <div id="error" role="alert" hidden></div>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <section id="board-view">
+      <div id="board" class="board" aria-label="产品、技术、UI、开发、测试、上线六阶段看板"></div>
+      <section id="detail" class="task-detail" aria-label="任务详情" hidden></section>
+      <section class="all-tasks"><div class="section-heading"><h2>全部任务 <span id="task-count" class="muted"></span></h2><span class="muted small">不含已归档任务</span></div><div class="table-wrap"><table><thead><tr><th>任务</th><th>项目</th><th>阶段</th><th>状态</th><th>进度</th><th>下一步</th><th>目标日期</th><th>操作</th></tr></thead><tbody id="task-table"></tbody></table></div></section>
+    </section>
+    <section id="archive-view" hidden><div class="archive-policy">本地归档副本保留 30 天，到期自动清理。Codex 已归档对话继续保留。</div><div class="table-wrap"><table><thead><tr><th>任务</th><th>项目</th><th>归档时阶段 / 状态</th><th>归档时间</th><th>本地副本</th><th>到期时间</th><th>Codex 对话</th></tr></thead><tbody id="archive-table"></tbody></table></div><section id="archive-detail" class="task-detail" hidden></section></section>
+    <footer><span id="database-path"></span><span>阶段与交付记录由 lifecycle skill 更新</span></footer>
+  </main>
+</body>
+</html>
